@@ -51,6 +51,7 @@ The script automatically detects file types and applies the appropriate renderin
 
 - https://github.com/PhMajerus/ANSI-art
 - https://github.com/NNBnh/ansi
+- https://16colo.rs/artist/anachronist (Mazinger Z)
 
 ## Tips
 
