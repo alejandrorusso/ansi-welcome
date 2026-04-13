@@ -64,10 +64,11 @@ trap 'rm -f "$tmpfile"' EXIT
 if [[ "$random_file" == *.utf8.ans ]]; then
     strip_sauce "$random_file" > "$tmpfile"
 elif [[ "$random_file" == *.ans ]]; then
-    if strip_sauce "$random_file" | iconv -f cp437 -t utf-8 > "$tmpfile" 2>/dev/null; then
-        :
-    else
+    # Check if file is already valid UTF-8 (pre-converted) or raw CP437
+    if strip_sauce "$random_file" | iconv -f utf-8 -t utf-8 >/dev/null 2>&1; then
         strip_sauce "$random_file" > "$tmpfile"
+    else
+        strip_sauce "$random_file" | iconv -f cp437 -t utf-8 > "$tmpfile" 2>/dev/null || strip_sauce "$random_file" > "$tmpfile"
     fi
 else
     strip_sauce "$random_file" > "$tmpfile"
