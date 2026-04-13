@@ -57,18 +57,33 @@ reset
 echo "=== ${random_file#./} ==="
 echo
 
-# Render the file
+# Render the file into a temp file
+tmpfile=$(mktemp)
+trap 'rm -f "$tmpfile"' EXIT
+
 if [[ "$random_file" == *.utf8.ans ]]; then
-    # Already UTF-8, no conversion needed
-    strip_sauce "$random_file"
+    strip_sauce "$random_file" > "$tmpfile"
 elif [[ "$random_file" == *.ans ]]; then
-    if strip_sauce "$random_file" | iconv -f cp437 -t utf-8 2>/dev/null; then
+    if strip_sauce "$random_file" | iconv -f cp437 -t utf-8 > "$tmpfile" 2>/dev/null; then
         :
     else
-        strip_sauce "$random_file"
+        strip_sauce "$random_file" > "$tmpfile"
     fi
 else
-    strip_sauce "$random_file"
+    strip_sauce "$random_file" > "$tmpfile"
+fi
+
+# Smooth scroll if content is taller than the terminal, otherwise show instantly
+term_rows=$(tput lines)
+file_lines=$(wc -l < "$tmpfile")
+
+if [ "$file_lines" -gt "$term_rows" ]; then
+    while IFS= read -r line; do
+        printf '%s\n' "$line"
+        sleep 0.03
+    done < "$tmpfile"
+else
+    cat "$tmpfile"
 fi
 
 # Reset terminal attributes and ensure prompt starts on a new line
