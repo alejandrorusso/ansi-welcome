@@ -65,7 +65,10 @@ for i in "${!files[@]}"; do
     echo
 
     # Render the file
-    if [[ "$file" == *.ans ]]; then
+    if [[ "$file" == *.utf8.ans ]]; then
+        # Already UTF-8, no conversion needed
+        strip_sauce "$file"
+    elif [[ "$file" == *.ans ]]; then
         if strip_sauce "$file" | iconv -f cp437 -t utf-8 2>/dev/null; then
             :
         else

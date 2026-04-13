@@ -50,12 +50,18 @@ fi
 # Pick a random file
 random_file=${files[$RANDOM % ${#files[@]}]}
 
+# Full terminal reset: clears screen, resets character sets, scroll regions, attributes
+reset
+
 # Print the filename (strip leading ./)
 echo "=== ${random_file#./} ==="
 echo
 
 # Render the file
-if [[ "$random_file" == *.ans ]]; then
+if [[ "$random_file" == *.utf8.ans ]]; then
+    # Already UTF-8, no conversion needed
+    strip_sauce "$random_file"
+elif [[ "$random_file" == *.ans ]]; then
     if strip_sauce "$random_file" | iconv -f cp437 -t utf-8 2>/dev/null; then
         :
     else
@@ -66,4 +72,4 @@ else
 fi
 
 # Reset terminal attributes and ensure prompt starts on a new line
-printf '\e[0m\e[999B\e[999D\n'
+printf '\e[0m\n'
