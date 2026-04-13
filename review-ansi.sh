@@ -2,9 +2,10 @@
 
 # Script to review ANSI art files one by one
 # Files that don't render properly are moved to a quarantine directory
-# Usage: ./review-ansi.sh
+# Usage: ./review-ansi.sh [directory]
 
-QUARANTINE_DIR="./quarantine"
+SEARCH_DIR="${1:-.}"
+QUARANTINE_DIR="$SEARCH_DIR/quarantine"
 mkdir -p "$QUARANTINE_DIR"
 
 # Strip SAUCE record (last 128 bytes if it starts with "SAUCE00") and any COMNT block,
@@ -39,8 +40,31 @@ strip_sauce() {
     cat "$file"
 }
 
-render_file() {
-    local file="$1"
+# Find all ANSI files (null-delimited to handle spaces in filenames)
+files=()
+while IFS= read -r -d '' f; do
+    files+=("$f")
+done < <(find "$SEARCH_DIR" -maxdepth 1 -type f \( -name "*.ans" -o -name "*.ansi" -o -name "*.txt" \) -not -name "source.md" -print0 | sort -z)
+
+if [ ${#files[@]} -eq 0 ]; then
+    echo "No ANSI files found in $SEARCH_DIR!"
+    exit 1
+fi
+
+total=${#files[@]}
+quarantined=0
+
+for i in "${!files[@]}"; do
+    file="${files[$i]}"
+    name="$(basename "$file")"
+    num=$((i + 1))
+
+    # Full terminal reset: clears screen, resets character sets, scroll regions, attributes
+    reset
+    echo "=== [$num/$total] $name ==="
+    echo
+
+    # Render the file
     if [[ "$file" == *.ans ]]; then
         if strip_sauce "$file" | iconv -f cp437 -t utf-8 2>/dev/null; then
             :
@@ -50,33 +74,9 @@ render_file() {
     else
         strip_sauce "$file"
     fi
+
+    # Reset terminal attributes and ensure prompt starts on a new line
     printf '\e[0m\e[999B\e[999D\n'
-}
-
-# Find all ANSI files (using null-delimited to handle spaces in filenames)
-files=()
-while IFS= read -r -d '' f; do
-    files+=("$f")
-done < <(find . -maxdepth 1 -type f \( -name "*.ans" -o -name "*.ansi" -o -name "*.txt" \) -not -name "source.md" -print0 | sort -z)
-
-if [ ${#files[@]} -eq 0 ]; then
-    echo "No ANSI files found in the current directory!"
-    exit 1
-fi
-
-total=${#files[@]}
-quarantined=0
-
-for i in "${!files[@]}"; do
-    file="${files[$i]}"
-    name="${file#./}"
-    num=$((i + 1))
-
-    # Full terminal reset: clears screen, resets character sets, scroll regions, attributes
-    reset
-    echo "=== [$num/$total] $name ==="
-    echo
-    render_file "$file"
 
     echo ""
     # Flush any leftover escape sequences from stdin before prompting
