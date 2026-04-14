@@ -63,21 +63,18 @@ printf '\e[0m\e[H\e[2J'
 echo "=== ${random_file} ==="
 echo
 
-# Render the file into a temp file
+# Strip sauce once, then convert if needed
 tmpfile=$(mktemp)
 trap 'rm -f "$tmpfile"' EXIT
+strip_sauce "$random_file" > "$tmpfile"
 
 if [[ "$random_file" == *.utf8.ans ]]; then
-    strip_sauce "$random_file" > "$tmpfile"
+    : # already good
 elif [[ "$random_file" == *.ans ]]; then
-    # Check if file is already valid UTF-8 (pre-converted) or raw CP437
-    if strip_sauce "$random_file" | iconv -f utf-8 -t utf-8 >/dev/null 2>&1; then
-        strip_sauce "$random_file" > "$tmpfile"
-    else
-        strip_sauce "$random_file" | iconv -f cp437 -t utf-8 > "$tmpfile" 2>/dev/null || strip_sauce "$random_file" > "$tmpfile"
+    # Convert from CP437 if not already valid UTF-8
+    if ! iconv -f utf-8 -t utf-8 < "$tmpfile" >/dev/null 2>&1; then
+        iconv -f cp437 -t utf-8 < "$tmpfile" 2>/dev/null > "$tmpfile.conv" && mv "$tmpfile.conv" "$tmpfile" || rm -f "$tmpfile.conv"
     fi
-else
-    strip_sauce "$random_file" > "$tmpfile"
 fi
 
 # Smooth scroll if content is taller than the terminal, otherwise show instantly
