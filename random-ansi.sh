@@ -35,11 +35,16 @@ strip_sauce() {
     cat "$file"
 }
 
-# Find all ANSI files (null-delimited to handle spaces in filenames)
-files=()
-while IFS= read -r -d '' f; do
-    files+=("$f")
-done < <(find . -maxdepth 1 -type f \( -name "*.ans" -o -name "*.ansi" -o -name "*.txt" \) -not -name "source.md" -print0)
+# Use bash globs instead of find — no subprocess needed
+shopt -s nullglob
+files=(*.ans *.ansi *.txt)
+shopt -u nullglob
+
+# Exclude source.md
+for i in "${!files[@]}"; do
+    [[ "${files[$i]}" == "source.md" ]] && unset 'files[$i]'
+done
+files=("${files[@]}")
 
 # Check if any files were found
 if [ ${#files[@]} -eq 0 ]; then
@@ -54,8 +59,8 @@ random_file=${files[$RANDOM % ${#files[@]}]}
 # is slow and can break UTF-8 mode)
 printf '\e[0m\e[H\e[2J'
 
-# Print the filename (strip leading ./)
-echo "=== ${random_file#./} ==="
+# Print the filename
+echo "=== ${random_file} ==="
 echo
 
 # Render the file into a temp file
