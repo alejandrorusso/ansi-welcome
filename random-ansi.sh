@@ -50,8 +50,9 @@ fi
 # Pick a random file
 random_file=${files[$RANDOM % ${#files[@]}]}
 
-# Full terminal reset: clears screen, resets character sets, scroll regions, attributes
-reset
+# Light reset: clear attributes, clear screen, move cursor home (avoids full "reset" which
+# is slow and can break UTF-8 mode)
+printf '\e[0m\e[H\e[2J'
 
 # Print the filename (strip leading ./)
 echo "=== ${random_file#./} ==="
