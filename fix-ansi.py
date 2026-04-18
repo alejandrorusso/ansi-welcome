@@ -260,15 +260,13 @@ def fix_color_bleed(data):
                     p = p.strip()
                     if p in (b'', b'0'):
                         bg_active = False
-                    elif p in (b'40', b'49'):
-                        bg_active = False
+                    elif p == b'49':
+                        bg_active = False  # default background only
                     elif len(p) <= 3:
                         try:
                             val = int(p)
-                            if 41 <= val <= 47 or 100 <= val <= 107:
-                                bg_active = True
-                            elif val == 48:
-                                bg_active = True  # 256/RGB bg
+                            if 40 <= val <= 47 or 48 == val or 100 <= val <= 107:
+                                bg_active = True  # any explicit bg, including black
                         except ValueError:
                             pass
 
