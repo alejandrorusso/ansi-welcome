@@ -206,6 +206,70 @@ def replace_control_chars(data):
     return bytes(out)
 
 
+def fix_color_bleed(data):
+    """Insert \\e[0m before newlines when a background color is active.
+
+    Modern terminals with BCE (Background Color Erase) extend background colors
+    to the right edge of the terminal. Classic ANSI art expects colors to stop
+    at the last written character. This fix resets attributes before each newline
+    where a non-default background is active.
+    """
+    out = bytearray()
+    bg_active = False
+    i = 0
+    n = len(data)
+
+    while i < n:
+        b = data[i]
+
+        # Parse ANSI escape sequences
+        if b == 0x1B and i + 1 < n and data[i + 1] == 0x5B:
+            # Find the full CSI sequence
+            j = i + 2
+            while j < n and data[j] not in range(0x40, 0x7F):
+                j += 1
+            if j < n:
+                j += 1
+            seq = data[i:j]
+
+            # Check if it's an SGR sequence (ends with 'm')
+            if seq[-1:] == b'm':
+                params = seq[2:-1]  # between ESC[ and m
+                # Parse semicolon-separated params
+                for p in params.split(b';'):
+                    p = p.strip()
+                    if p in (b'', b'0'):
+                        bg_active = False
+                    elif p in (b'40', b'49'):
+                        bg_active = False
+                    elif len(p) <= 3:
+                        try:
+                            val = int(p)
+                            if 41 <= val <= 47 or 100 <= val <= 107:
+                                bg_active = True
+                            elif val == 48:
+                                bg_active = True  # 256/RGB bg
+                        except ValueError:
+                            pass
+
+            out.extend(seq)
+            i = j
+            continue
+
+        if b == 0x0A:
+            if bg_active:
+                out.extend(b'\x1b[0m')
+                bg_active = False
+            out.append(b)
+            i += 1
+            continue
+
+        out.append(b)
+        i += 1
+
+    return bytes(out), out != bytearray(data)
+
+
 def process_file(filepath):
     with open(filepath, 'rb') as f:
         data = f.read()
@@ -236,7 +300,12 @@ def process_file(filepath):
         content = add_wrapping(content, width)
         changes.append(f"wrap@{width}")
 
-    # Fix 3: Mark UTF-8 files by renaming (so render script can skip iconv)
+    # Fix 3: Reset background color before newlines (BCE bleed fix)
+    content, had_bleed = fix_color_bleed(content)
+    if had_bleed:
+        changes.append("bce-fix")
+
+    # Fix 4: Mark UTF-8 files by renaming (so render script can skip iconv)
     if utf8_file and not filepath.endswith('.utf8.ans'):
         base = filepath.rsplit('.ans', 1)[0]
         new_path = base + '.utf8.ans'
