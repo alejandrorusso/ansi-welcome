@@ -78,6 +78,19 @@ def is_utf8(data):
         return False
 
 
+def parse_csi_cursor_advance(data, start, end):
+    """Return how many columns a CSI sequence advances the cursor, or 0."""
+    seq = data[start:end]
+    final = seq[-1:]
+    if final == b'C':  # Cursor Forward
+        params = seq[2:-1]
+        try:
+            return int(params) if params else 1
+        except ValueError:
+            return 1
+    return 0
+
+
 def has_lines_exceeding_width(data, width):
     """Check if any line has visible characters exceeding the target width."""
     col = 0
@@ -94,6 +107,7 @@ def has_lines_exceeding_width(data, width):
                 j += 1
             if j < n:
                 j += 1
+            col += parse_csi_cursor_advance(data, i, j)
             i = j
             continue
 
@@ -111,7 +125,7 @@ def has_lines_exceeding_width(data, width):
 
 
 def add_wrapping(data, width):
-    """Insert newlines at column boundaries, skipping ANSI escape sequences."""
+    """Insert newlines at column boundaries, accounting for cursor movement."""
     out = bytearray()
     col = 0
     i = 0
@@ -127,7 +141,13 @@ def add_wrapping(data, width):
                 j += 1
             if j < n:
                 j += 1
+            advance = parse_csi_cursor_advance(data, i, j)
+            if advance > 0 and col + advance >= width:
+                # Cursor forward would exceed width — wrap first
+                out.append(0x0A)
+                col = 0
             out.extend(data[i:j])
+            col += advance
             i = j
             continue
 
