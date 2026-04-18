@@ -129,11 +129,13 @@ def has_lines_exceeding_width(data, width):
 def add_wrapping(data, width):
     """Insert newlines at column boundaries, accounting for cursor movement.
 
-    Strips existing LF/CR from content before re-wrapping, since files needing
-    wrapping use continuous 80-col flow where original line breaks are BBS artifacts.
+    Preserves original LFs at positions < width (intentional short lines).
+    Suppresses original LFs right after a wrapping newline (redundant).
+    Strips CR bytes.
     """
     out = bytearray()
     col = 0
+    just_wrapped = False
     i = 0
     n = len(data)
 
@@ -151,22 +153,37 @@ def add_wrapping(data, width):
             if advance > 0 and col + advance >= width:
                 out.append(0x0A)
                 col = 0
+                just_wrapped = True
             out.extend(data[i:j])
             col += advance
+            if advance > 0:
+                just_wrapped = False
             i = j
             continue
 
-        # Strip original CR and LF — we re-wrap from scratch
-        if b in (0x0D, 0x0A):
+        # Strip CR
+        if b == 0x0D:
             i += 1
             continue
 
+        # LF handling: suppress if redundant (right after a wrap), keep otherwise
+        if b == 0x0A:
+            if just_wrapped:
+                just_wrapped = False
+            else:
+                out.append(b)
+                col = 0
+            i += 1
+            continue
+
+        just_wrapped = False
         out.append(b)
         col += 1
 
         if col >= width:
             out.append(0x0A)
             col = 0
+            just_wrapped = True
 
         i += 1
 
