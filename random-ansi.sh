@@ -1,7 +1,10 @@
 #!/bin/bash
 
 # Script to randomly pick and render ANSI art files
-# Usage: ./random-ansi.sh
+# Usage: ./random-ansi.sh          (pick random file each time)
+#        ./random-ansi.sh --cache   (use pre-generated cache of 20 shuffled files)
+
+CACHE_FILE="${HOME}/.ansi-welcome-cache"
 
 # Strip SAUCE record (last 128 bytes if it starts with "SAUCE00") and any COMNT block,
 # then also remove the EOF marker (0x1A / SUB) if present.
@@ -35,25 +38,61 @@ strip_sauce() {
     cat "$file"
 }
 
-# Use bash globs instead of find — no subprocess needed
-shopt -s nullglob
-files=(*.ans *.ansi *.txt)
-shopt -u nullglob
+# Generate a new shuffled cache of 20 files
+generate_cache() {
+    shopt -s nullglob
+    local all=(*.ans *.ansi *.txt)
+    shopt -u nullglob
 
-# Exclude source.md
-for i in "${!files[@]}"; do
-    [[ "${files[$i]}" == "source.md" ]] && unset 'files[$i]'
-done
-files=("${files[@]}")
+    # Exclude source.md
+    local filtered=()
+    for f in "${all[@]}"; do
+        [[ "$f" != "source.md" ]] && filtered+=("$f")
+    done
 
-# Check if any files were found
-if [ ${#files[@]} -eq 0 ]; then
-    echo "No ANSI files found in the current directory!"
-    exit 1
+    if [ ${#filtered[@]} -eq 0 ]; then
+        echo "No ANSI files found in the current directory!"
+        exit 1
+    fi
+
+    # Shuffle and pick up to 20
+    printf '%s\n' "${filtered[@]}" | shuf | head -20 > "$CACHE_FILE"
+}
+
+if [ "$1" = "--cache" ]; then
+    # Cache mode: pop the first file from cache, regenerate when empty
+    if [ ! -s "$CACHE_FILE" ]; then
+        generate_cache
+    fi
+
+    # Pop first line
+    random_file=$(head -1 "$CACHE_FILE")
+    sed -i '1d' "$CACHE_FILE"
+else
+    # Original mode: pick a random file each time
+    shopt -s nullglob
+    files=(*.ans *.ansi *.txt)
+    shopt -u nullglob
+
+    for i in "${!files[@]}"; do
+        [[ "${files[$i]}" == "source.md" ]] && unset 'files[$i]'
+    done
+    files=("${files[@]}")
+
+    if [ ${#files[@]} -eq 0 ]; then
+        echo "No ANSI files found in the current directory!"
+        exit 1
+    fi
+
+    random_file=${files[$RANDOM % ${#files[@]}]}
 fi
 
-# Pick a random file
-random_file=${files[$RANDOM % ${#files[@]}]}
+# Verify file exists (it might have been removed since cache was built)
+if [ ! -f "$random_file" ]; then
+    # Invalidate cache and retry
+    rm -f "$CACHE_FILE"
+    exec "$0" "$@"
+fi
 
 # Light reset: clear attributes, clear screen, move cursor home (avoids full "reset" which
 # is slow and can break UTF-8 mode)
