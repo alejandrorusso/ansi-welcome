@@ -98,10 +98,6 @@ fi
 # is slow and can break UTF-8 mode)
 printf '\e[0m\e[H\e[2J'
 
-# Print the filename
-echo "=== ${random_file} ==="
-echo
-
 # Strip sauce once, then convert if needed
 tmpfile=$(mktemp)
 trap 'rm -f "$tmpfile"' EXIT
@@ -129,5 +125,6 @@ else
     cat "$tmpfile"
 fi
 
-# Reset terminal attributes and ensure prompt starts on a new line
+# Reset terminal attributes, print filename, and ensure prompt starts on a new line
 printf '\e[0m\n'
+echo "=== ${random_file} ==="
