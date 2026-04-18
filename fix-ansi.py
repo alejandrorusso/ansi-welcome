@@ -291,12 +291,12 @@ def convert_ice_colors(data):
 
 
 def fix_color_bleed(data):
-    """Insert \\e[0m before newlines when a background color is active.
+    """Insert \\e[49m before newlines when a background color is active.
 
     Modern terminals with BCE (Background Color Erase) extend background colors
     to the right edge of the terminal. Classic ANSI art expects colors to stop
-    at the last written character. This fix resets attributes before each newline
-    where a non-default background is active.
+    at the last written character. This fix resets only the background before each
+    newline, preserving foreground color and other attributes like bold.
     """
     out = bytearray()
     bg_active = False
@@ -340,7 +340,7 @@ def fix_color_bleed(data):
 
         if b == 0x0A:
             if bg_active:
-                out.extend(b'\x1b[0m')
+                out.extend(b'\x1b[49m')  # reset background only, keep fg/bold
                 bg_active = False
             out.append(b)
             i += 1
