@@ -3,10 +3,7 @@
 # Script to review ANSI art files one by one
 # Files that don't render properly are moved to a quarantine directory
 # Usage: ./review-ansi.sh [directory]
-
-SEARCH_DIR="${1:-.}"
-QUARANTINE_DIR="$SEARCH_DIR/quarantine"
-mkdir -p "$QUARANTINE_DIR"
+#        ./review-ansi.sh <file>       (display a single file and exit)
 
 # Strip SAUCE record (last 128 bytes if it starts with "SAUCE00") and any COMNT block,
 # then also remove the EOF marker (0x1A / SUB) if present.
@@ -39,6 +36,33 @@ strip_sauce() {
     fi
     cat "$file"
 }
+
+# Single file mode: display one file and exit
+if [ -f "$1" ]; then
+    file="$1"
+    reset
+    echo "=== $(basename "$file") ==="
+    echo
+
+    if [[ "$file" == *.utf8.ans ]]; then
+        strip_sauce "$file"
+    elif [[ "$file" == *.ans ]]; then
+        if strip_sauce "$file" | iconv -f cp437 -t utf-8 2>/dev/null; then
+            :
+        else
+            strip_sauce "$file"
+        fi
+    else
+        strip_sauce "$file"
+    fi
+
+    printf '\e[0m\n'
+    exit 0
+fi
+
+SEARCH_DIR="${1:-.}"
+QUARANTINE_DIR="$SEARCH_DIR/quarantine"
+mkdir -p "$QUARANTINE_DIR"
 
 # Find all ANSI files (null-delimited to handle spaces in filenames)
 files=()
